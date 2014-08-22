@@ -224,122 +224,253 @@ MC1000.TOKENS = [
 ];
 
 MC1000.prototype.getBasicProgram = function() {
+	var me = this; // 'this' refers to 'window' in the state functions. Use 'me' to keep reference to MC1000 object.
 	var program = "";
-	var i, c;
+	var i, nl, b, c;
+	var state;
+	
+	var stateToken = function() {
+		if (b >= 128 && b - 128 < MC1000.TOKENS.length) {
+			var detokenized = MC1000.TOKENS[b - 128];
+			program += " " + detokenized + " ";
+			switch (detokenized) {
+			case "DATA": state = stateDATA; break;
+			case "REM" : state = stateREM ; break;
+			}
+		} else if (c == " ") {
+			program += "~20";
+		} else {
+			stateChar();
+			if (c == '"') state = stateString;
+		}
+	};
+	
+	var stateString = function() {
+		stateChar();
+		if (c == '"') state = stateToken;
+	};
+	
+	var stateDATA = function() {
+		if (c == " ") {
+			program += "~20";
+			state = stateDATA2;
+		} else {
+			state = stateDATA2;
+			stateDATA2();
+		}
+	};
+	
+	var stateDATA2 = function() {
+		stateChar();
+		switch (c) {
+		case " ":
+		case ",": break;
+		case '"': state = stateDATAString; break;
+		case ":": state = stateToken; break;
+		default: state = stateDATA3; break;
+		}
+	};
+	
+	var stateDATA3 = function() {
+		stateChar();
+		switch (c) {
+		case ",": state = stateDATA2; break;
+		case ":": state = stateToken; break;
+		}
+	};
+	
+	var stateDATAString = function() {
+		stateChar();
+		if (c == '"') state = stateDATA2;
+	};
+	
+	var stateREM = function() {
+		switch (c) {
+		case " ": program += "~20"; state = stateChar; break;
+		default: state = stateChar; stateChar(); break;
+		}
+	};
+	
+	var stateChar = function() {
+		if (c == " " && me.ram.read(i) == 0) {
+			// Space at end of line.
+			program += "~20";
+		} else if (b >= 32 && b < 96) {
+			// Ordinary MC6847 ASCII character.
+			program += c;
+		} else if (b - 128 >= 32 && b - 128 < 96) {
+			// Inverted MC6847 ASCII characters:
+			// Grave + ordinary character. (E.g.: "`A")
+			program += "`" + String.fromCharCode(b - 128);
+		} else {
+			// Other characters:
+			// Tilde + 2-digit hex code. (Ex.: "~FF")
+			program += "~" + (b < 0x10 ? "0" : "") + b.toString(16).toUpperCase();
+		}
+	};
 
-	// Get BASIC program start address.
+	// Get BASIC program start address at 0x349 (usually 0x3d5).
 	i = this.ram.read(0x349) | (this.ram.read(0x34a) << 8);
-	// While not end of program...
-	while ((this.ram.read(i++) | this.ram.read(i++)) != 0) {
+	while (true) {
+		// Get address of next BASIC line.
+		nl = this.ram.read(i++) | (this.ram.read(i++) << 8);
+		// 0x000 signals end of program.
+		if (nl == 0) break;
 		// Print line number.
 		program += (this.ram.read(i++) | (this.ram.read(i++) << 8)) + " ";
-		// While not end of line...
-		while ((c = this.ram.read(i++)) != 0) {
-			if ((c < 128) || (c - 128 >= MC1000.TOKENS.length)) {
-				// Print ordinary character.
-				program += String.fromCharCode(c);
-			} else {
-				// Print reserved word.
-				program += " " + MC1000.TOKENS[c - 128] + " ";
-			}
+		// Initial state.
+		state = stateToken;
+		while (true) {
+			// Get next byte/character.
+			b = this.ram.read(i++);
+			c = String.fromCharCode(b);
+			// Expected end-of-line situation.
+			if (i >= nl && b == 0) break;
+			// Process byte/character.
+			state();
+			// Abnormal end-of-line situation.
+			if (i >= nl) break;
 		}
 		program += "\n";
+		i = nl;
 	}
 	return program;
 };
-MC1000.prototype.setBasicProgram = function(program) {
-	var basicst = this.ram.read(0x349) | (this.ram.read(0x34a) << 8);
 
-	var lines = program.toUpperCase().split("\n");
+MC1000.prototype.setBasicProgram = function(program) {
+	var me = this; // 'this' refers to 'window' in the state functions. Use 'me' to keep reference to MC1000 object.
+	var basicst = this.ram.read(0x349) | (this.ram.read(0x34a) << 8);
+	var lines, line;
 	var k, linest;
-	k = linest = basicst;
-	for (var i = 0; i < lines.length; i++) {
-		var line = lines[i].replace(/^\s\s*/, "").replace(/\s\s*$/, "");
-		if (line.length) {
-			var j = 0;
-			var lineno = 0;
-			var c;
-			while (j < line.length && (c = line.charAt(j)) >= "0" && c <= "9") {
-				j++;
-				lineno = (lineno * 10) + parseInt(c); 
-			}
-			k += 2;
-			this.ram.write(k++, lineno & 0xff);
-			this.ram.write(k++, (lineno >> 8) & 0xff);
-			var mode = 0;
-			while (j < line.length) {
-				c = line.charAt(j);
-				this.ram.write(k, c.charCodeAt(0));
-				switch (mode) {
-				case 0:
-					if (c == " ") {
-						// Ignore spaces.
-						k--;
-					} else if (c == '"') {
-						// Start of string.
-						mode = 1;
-					} else {
-						// Token?
-						for (var l = 0; l < MC1000.TOKENS.length; l++) {
-							if (line.substr(j, MC1000.TOKENS[l].length) == MC1000.TOKENS[l]) {
-								c = l + 0x80;
-								j += MC1000.TOKENS[l].length;
-								this.ram.write(k, c);
-								if (MC1000.TOKENS[l] == "REM") {
-									while (line.charAt(j) == " ") {
-										j++;
-									}
-									mode = 3;
-								}
-								if (MC1000.TOKENS[l] == "DATA") {
-									while (line.charAt(j) == " ") {
-										j++;
-									}
-									mode = 4;
-								}
-								j--;
-								break;
-							}
-						}
-					}
-					break;
-				case 1: // String.
-					if (c == '"') {
-						// End of string.
-						mode = 0;
-					}
-					break;
-				case 2: // String within DATA statement.
-					if (c == '"') {
-						// End of string.
-						mode = 4;
-					}
-					break;
-				case 3: // REM statement.
-					break;
-				case 4: // DATA statement.
-					if (c == ':') {
-						// End of DATA statement.
-						mode = 0;
-					} else if (c == '"') {
-						// Start of string.
-						mode = 2;
+	k = basicst;
+	var i, j;
+	var b, c;
+	var state;
+	
+	var stateToken = function() {
+		switch (c) {
+		// Ignore spaces.
+		case " ": k--; break;
+		// Start of string?
+		case '"': state = stateString; break;
+		default:
+			// Token?
+			var tokenFound = false;
+			for (var l = 0; l < MC1000.TOKENS.length; l++) {
+				var token = MC1000.TOKENS[l];
+				if (line.substr(j, token.length) == token) {
+					tokenFound = true;
+					me.ram.write(k, l + 0x80);
+					j += token.length - 1;
+					switch (token) {
+					case "DATA": state = stateDATA;
+					case "REM": state = stateREM;
 					}
 					break;
 				}
+			}
+			if (!tokenFound) {
+				// Other characters.
+				stateChar();
+			}
+		}
+	};
+	
+	var stateString = function() {
+		stateChar();
+		if (c == '"') state = stateToken;
+	};
+	
+	var stateDATA = function() {
+		switch (c) {
+		case " ": k--; break;
+		default: state = stateDATA2; stateDATA2(); break;
+		}
+	};
+	
+	var stateDATA2 = function() {
+		stateChar();
+		switch (c) {
+		case " ":
+		case ",": break;
+		case '"': state = stateDATAString; break;
+		case ":": state = stateToken; break;
+		default: state = stateDATA3; break;
+		}
+	};
+	
+	var stateDATA3 = function() {
+		stateChar();
+		switch (c) {
+		case ",": state = stateDATA2; break;
+		case ":": state = stateToken; break;
+		}
+	};
+	
+	var stateREM = function() {
+		switch (c) {
+		case " ": k--; break;
+		default: state = stateChar; stateChar(); break;
+		}
+	};
+	
+	var stateChar = function() {
+		switch (c) {
+		// Inverse character.
+		case "`":
+			if (j + 1 < line.length) {
+				me.ram.write(k, line.charCodeAt(++j) ^ 0x80);
+			}
+			break;
+		// Hex code.
+		case "~":
+			if (j + 2 < line.length) {
+				var hex = line.substr(j + 1, 2);
+				if (hex.match(/^[0-9a-fA-F]{2}$/)) {
+					me.ram.write(k, parseInt(hex, 16));
+					j += 2;
+				}
+			}
+			break;
+		}
+	};
+	
+	lines = program.toUpperCase().split("\n");
+	for (i = 0; i < lines.length; i++) {
+		line = lines[i];
+		var match = line.match(/^\s*(\d*)\s*(\D.*?)?\s*$/);
+		if (match[1] || match[2]) {
+			linest = k;
+			k += 2;
+			
+			var lineno = parseInt(match[1]) || 0;
+			this.ram.write(k++, lineno & 0xff);
+			this.ram.write(k++, (lineno >> 8) & 0xff);
+			
+			line = match[2] || "";
+			
+			j = 0;
+			state = stateToken;
+			
+			while (j < line.length) {
+				c = line.charAt(j);
+				b = c.charCodeAt(0);
+				this.ram.write(k, c.charCodeAt(0));
+				
+				state();
+				
 				j++;
 				k++;
 			}
 			this.ram.write(k++, 0);
 			this.ram.write(linest, k & 0xff);
 			this.ram.write(linest + 1, (k >> 8) & 0xff);
-			linest = k;
 		}
 	}
 	this.ram.write(k++, 0);
 	this.ram.write(k++, 0);
 	this.ram.write(0x3b7, k & 0xff);
-    this.ram.write(0x3b8, (k >> 8) & 0xff);
+	this.ram.write(0x3b8, (k >> 8) & 0xff);
 };
 
 MC1000.prototype.getTextScreen = function() {
