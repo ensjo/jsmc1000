@@ -230,81 +230,103 @@ MC1000.prototype.getBasicProgram = function() {
 	var state;
 	
 	var stateToken = function() {
+		// Standard strategy.
 		if (b >= 128 && b - 128 < MC1000.TOKENS.length) {
+			// Token found: Output corresponding reserved word with padding spaces.
 			var detokenized = MC1000.TOKENS[b - 128];
 			program += " " + detokenized + " ";
+			// Some reserved words imply a change in strategy.
 			switch (detokenized) {
-			case "DATA": state = stateDATA; break;
-			case "REM" : state = stateREM ; break;
+			case "DATA":
+				state = stateDATA;
+				break;
+			case "REM":
+			case "SAVE":
+			case "LOAD" :
+				state = stateChar;
+				break;
 			}
-		} else if (c == " ") {
-			program += "~20";
 		} else {
-			stateChar();
-			if (c == '"') state = stateString;
+			switch (c) {
+				case " ":
+					// Space found: Output hexadecimal notation so it is not lost.
+					program += "~20";
+					break;
+				default:
+					stateStringOrChar();
+			}
 		}
 	};
 	
-	var stateString = function() {
-		stateChar();
-		if (c == '"') state = stateToken;
-	};
-	
 	var stateDATA = function() {
-		if (c == " ") {
-			program += "~20";
+		// Handles characters between data items in a DATA instruction: spaces, commas...
+		stateStringOrChar();
+		switch (c) {
+		case " ":
+		case ",":
+			// Space or comma don't change the strategy.
+			break;
+		case ":":
+			// End of DATA instruction.
+			state = stateToken;
+			break;
+		default:
+			// Data item found.
 			state = stateDATA2;
-		} else {
-			state = stateDATA2;
-			stateDATA2();
 		}
 	};
 	
 	var stateDATA2 = function() {
-		stateChar();
+		// Handles data item in DATA instruction.
+		stateStringOrChar();
 		switch (c) {
-		case " ":
-		case ",": break;
-		case '"': state = stateDATAString; break;
-		case ":": state = stateToken; break;
-		default: state = stateDATA3; break;
+		case ",":
+			// Back to handling characters between data items.
+			state = stateDATA;
+			break;
+		case ":":
+			// End of DATA instruction.
+			state = stateToken;
+			break;
 		}
 	};
 	
-	var stateDATA3 = function() {
+	var stateStringOrChar = function() {
+		// Identifies start of string.
 		stateChar();
 		switch (c) {
-		case ",": state = stateDATA2; break;
-		case ":": state = stateToken; break;
+		case '"':
+			// Start of string.
+			// Saves current strategy to resume when string ends.
+			stateBeforeString = state;
+			state = stateString;
+			break;
 		}
 	};
 	
-	var stateDATAString = function() {
+	var stateString = function() {
+		// Handles string content until ending quotes are found.
 		stateChar();
-		if (c == '"') state = stateDATA2;
-	};
-	
-	var stateREM = function() {
 		switch (c) {
-		case " ": program += "~20"; state = stateChar; break;
-		default: state = stateChar; stateChar(); break;
+		case '"':
+			// End of string.
+			state = stateBeforeString;
+			break;
 		}
 	};
 	
 	var stateChar = function() {
-		if (c == " " && me.ram.read(i) == 0) {
-			// Space at end of line.
-			program += "~20";
-		} else if (b >= 32 && b < 96) {
-			// Ordinary MC6847 ASCII character.
+		// Handles characters.
+		if (b >= 32 && b < 96) {
+			// MC6847's ASCII character.
 			program += c;
-		} else if (b - 128 >= 32 && b - 128 < 96) {
-			// Inverted MC6847 ASCII characters:
-			// Grave + ordinary character. (E.g.: "`A")
-			program += "`" + String.fromCharCode(b - 128);
+		} else if ((b ^ 0x80) >= 32 && (b ^ 0x80) < 96) {
+			// MC6847's ASCII character in INVERSE video.
+			// Output grave + normal character.
+			program += "`" + String.fromCharCode(b ^ 0x80);
 		} else {
-			// Other characters:
-			// Tilde + 2-digit hex code. (Ex.: "~FF")
+			// Other characters.
+			// Output as tilde + hexadecimal code.
 			program += "~" + (b < 0x10 ? "0" : "") + b.toString(16).toUpperCase();
 		}
 	};
@@ -348,11 +370,13 @@ MC1000.prototype.setBasicProgram = function(program) {
 	var state;
 	
 	var stateToken = function() {
+		// Default strategy: Discards spaces and tokenizes reserved words.
+
 		switch (c) {
-		// Ignore spaces.
-		case " ": k--; break;
-		// Start of string?
-		case '"': state = stateString; break;
+		case " ":
+			// Discards spaces.
+			k--;
+			break;
 		default:
 			// Token?
 			var tokenFound = false;
@@ -360,70 +384,128 @@ MC1000.prototype.setBasicProgram = function(program) {
 				var token = MC1000.TOKENS[l];
 				if (line.substr(j, token.length) == token) {
 					tokenFound = true;
-					me.ram.write(k, l + 0x80);
+					me.ram.write(k, l ^ 0x80);
 					j += token.length - 1;
-					switch (token) {
-					case "DATA": state = stateDATA;
-					case "REM": state = stateREM;
-					}
 					break;
 				}
 			}
-			if (!tokenFound) {
+			if (tokenFound) {
+				// Some reserved words imply a change in strategy.
+				switch (token) {
+				case "DATA":
+					state = stateDATA;
+					break;
+				case "REM":
+				case "SAVE":
+				case "LOAD":
+					state = stateREM;
+					break;
+				}
+			} else {
 				// Other characters.
-				stateChar();
+				stateStringOrChar();
 			}
 		}
 	};
 	
-	var stateString = function() {
-		stateChar();
-		if (c == '"') state = stateToken;
-	};
-	
 	var stateDATA = function() {
+		// Handles start of DATA instruction: Discards first space, if any.
 		switch (c) {
-		case " ": k--; break;
-		default: state = stateDATA2; stateDATA2(); break;
+		case " ":
+			// Discards first space after "DATA" word.
+			k--;
+			state = stateDATA2;
+			break;
+		default:
+			state = stateDATA2;
+			stateDATA2();
+			break;
 		}
 	};
 	
 	var stateDATA2 = function() {
+		// Handles characters between items of data in DATA instruction: spaces, commas...
 		stateChar();
 		switch (c) {
 		case " ":
-		case ",": break;
-		case '"': state = stateDATAString; break;
-		case ":": state = stateToken; break;
-		default: state = stateDATA3; break;
+		case ",":
+			// Space or comma don't change the strategy.
+			break;
+		case ":":
+			// End of DATA instruction.
+			state = stateToken;
+			break;
+		default:
+			// item of data found.
+			state = stateDATA3;
+			break;
 		}
 	};
 	
 	var stateDATA3 = function() {
-		stateChar();
+		// Handles data item in DATA instruction.
+		stateStringOrChar();
 		switch (c) {
-		case ",": state = stateDATA2; break;
-		case ":": state = stateToken; break;
+		case ",":
+			// Back to handling characters between items of data.
+			state = stateDATA2;
+			break;
+		case ":":
+			// End of DATA instruction.
+			state = stateToken;
+			break;
 		}
 	};
 	
 	var stateREM = function() {
+		// Handles start of REM/SAVE/LOAD instruction: Discards first space, if any.
 		switch (c) {
-		case " ": k--; break;
-		default: state = stateChar; stateChar(); break;
+		case " ":
+			// Discards first space after REM/SAVE/LOAD.
+			k--;
+			break;
+		default:
+			state = stateChar;
+			stateChar();
+			break;
+		}
+	};
+	
+	var stateStringOrChar = function() {
+		// Identifies start of string.
+		stateChar();
+		switch (c) {
+		case '"':
+			// Start of string.
+			// Saves current strategy to resume when string ends.
+			stateBeforeString = state;
+			state = stateString;
+			break;
+		}
+	};
+
+	var stateString = function() {
+		// Handles string content until quote is found.
+		stateChar();
+		switch (c) {
+		case '"':
+			// End of string.
+			state = stateBeforeString;
+			break;
 		}
 	};
 	
 	var stateChar = function() {
+		// Handles characters.
 		switch (c) {
-		// Inverse character.
 		case "`":
+			// Inverse video character notation: `X.
 			if (j + 1 < line.length) {
 				me.ram.write(k, line.charCodeAt(++j) ^ 0x80);
 			}
 			break;
-		// Hex code.
 		case "~":
+			// Hexadecimal notation: ~XX.
 			if (j + 2 < line.length) {
 				var hex = line.substr(j + 1, 2);
 				if (hex.match(/^[0-9a-fA-F]{2}$/)) {
@@ -440,13 +522,22 @@ MC1000.prototype.setBasicProgram = function(program) {
 		line = lines[i];
 		var match = line.match(/^\s*(\d*)\s*(\D.*?)?\s*$/);
 		if (match[1] || match[2]) {
+			// Tokenized line consists of:
+			// 2 bytes that point to the next line.
+			// + 2 bytes containing line number.
+			// + line content.
+			// + 1 byte 0 at end of line.
+
+			// Save line start position to be updated later with pointer to next line.
 			linest = k;
 			k += 2;
 			
+			// Line number.
 			var lineno = parseInt(match[1]) || 0;
 			this.ram.write(k++, lineno & 0xff);
 			this.ram.write(k++, (lineno >> 8) & 0xff);
 			
+			// Line content.
 			line = match[2] || "";
 			
 			j = 0;
@@ -455,20 +546,24 @@ MC1000.prototype.setBasicProgram = function(program) {
 			while (j < line.length) {
 				c = line.charAt(j);
 				b = c.charCodeAt(0);
-				this.ram.write(k, c.charCodeAt(0));
+				this.ram.write(k, b);
 				
 				state();
 				
 				j++;
 				k++;
 			}
+			// Byte 0 at end of line.
 			this.ram.write(k++, 0);
+			// Update pointer to next line.
 			this.ram.write(linest, k & 0xff);
 			this.ram.write(linest + 1, (k >> 8) & 0xff);
 		}
 	}
+	// Output end of program.
 	this.ram.write(k++, 0);
 	this.ram.write(k++, 0);
+	// Update system variable that points to end of program.
 	this.ram.write(0x3b7, k & 0xff);
 	this.ram.write(0x3b8, (k >> 8) & 0xff);
 };
