@@ -70,7 +70,7 @@ var mc1000HtmlDelegate = {
 		return document.getElementById("builtIn64kbRam").checked;
 	},
 	log: function(str) {
-		document.getElementById("logBuffer").value += str;
+		console.log(str);
 	},
 	print: function(str) {
 		document.getElementById("printerOutput").value += str;
@@ -126,8 +126,8 @@ function mc1000Reset() {
 	http://jsmsx.sourceforge.net/</a>.
 	<br />
 	AY-3-8910 emulation based on <strong>T'Sound System</strong> &mdash;
-	<a href="http://code.google.com/p/tss/" target="_blank">
-	http://code.google.com/p/tss/</a>.
+	<a href="https://github.com/toyoshim/tss" target="_blank">
+	https://github.com/toyoshim/tss</a>.
 </p>
 
 <fieldset>
@@ -154,12 +154,12 @@ function mc1000Reset() {
 <fieldset>
 <legend>Setup:</legend>
 <span style="white-space: nowrap">
-<input id="builtIn64kbRam" type="checkbox" value="1" checked="checked" />
+<input id="builtIn64kbRam" type="checkbox" value="1" checked="checked" disabled="disabled"/>
 <label for="builtIn64kbRam">Built-in 64KB RAM.</label>
 </span>
 
 <span style="white-space: nowrap">
-<input id="useMC6847EnsjoMod" type="checkbox" value="1" checked="checked" />
+<input id="useMC6847EnsjoMod" type="checkbox" value="1" checked="checked" disabled="disabled" />
 <label for="useMC6847EnsjoMod">Use MC6847 Ensjo mod.</label>
 </span>
 
@@ -245,9 +245,8 @@ function mc1000Reset() {
 <ruby><button class="charKey">L</button><rt>LIST</rt></ruby>
 <ruby><button class="charKey">;</button><rt>+</rt></ruby>
 <ruby><button class="charKey">:</button><rt>*</rt></ruby>
-<label for="ctrlPressed">CTRL
+<button>CTRL</button>
 <input id="ctrlPressed" type="checkbox" value="1" />
-</label>
 <br />
 <input id="shiftPressed" type="checkbox" value="1" />
 <button>SHIFT</button>
@@ -265,15 +264,13 @@ function mc1000Reset() {
 <button>SPACE</button>
 </fieldset>
 
+<!--
+A ideia é depois criar uma pseudo-placa de impressora e fazê-la exibir as impressões aqui: 
 <fieldset>
 <legend>Printer output:</legend>
-<textarea id="printerOutput" cols="80" rows="10"></textarea>
+<textarea id="printerOutput" cols="80" rows="10" disabled="disabled"></textarea>
 </fieldset>
-
-<fieldset>
-<legend>Log buffer:</legend>
-<textarea id="logBuffer" cols="80" rows="10"></textarea>
-</fieldset>
+-->
 
 </form>
 
