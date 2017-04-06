@@ -41,9 +41,9 @@ MC1000Core.prototype.init = function() {
 	this.vdgLatch = 0;
 	
 	// Calculated from vdgLatch:
-	this.vdgAg = 0; // ¬A/G (Alphanumerics/Graphics).
-	this.vdgAs = 0; // ¬A/S (Alphanumerics/Semigraphics).
-	this.vdgIntext = 0; // ¬INT/EXT (Internal/External).
+	this.vdgAg = 0; // ï¿½A/G (Alphanumerics/Graphics).
+	this.vdgAs = 0; // ï¿½A/S (Alphanumerics/Semigraphics).
+	this.vdgIntext = 0; // ï¿½INT/EXT (Internal/External).
 	this.vdgInv = 0; // INV (Invert).
 	this.vdgGm = 0; // GM0~GM2 (Graphic Mode).
 	this.vdgCss = 0; // CSS (Color Select).
@@ -242,6 +242,7 @@ MC1000Core.prototype.mc1000KeyboardLog = function(str) {
 
 // Other...
 
+/*
 MC1000Core.prototype.interruptStart = function() {
 	var self = this;
 	this.interval = setInterval(self.interrupt,17); //60 intervals/sec
@@ -250,6 +251,7 @@ MC1000Core.prototype.interruptStart = function() {
 MC1000Core.prototype.interruptStop = function() {
 	clearInterval(this.interval);
 };
+*/
 
 MC1000Core.prototype.execute = function() {
 	if (this.resetAtNextInterrupt) {

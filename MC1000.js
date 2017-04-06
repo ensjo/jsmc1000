@@ -24,6 +24,20 @@ MC1000.prototype.executeStart = function() {
 	this.core.executeStart();
 };
 
+MC1000.prototype.executeStop = function() {
+	if (!this.core) {
+		this.init();
+	}
+	this.core.executeStop();
+};
+
+MC1000.prototype.reset = function() {
+	if (!this.core) {
+		this.init();
+	}
+	this.core.reset();
+};
+
 // MC-1000 Core delegate methods.
 
 MC1000.prototype.mc1000CoreGetZ80 = function(mc1000Core) {

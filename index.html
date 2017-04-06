@@ -1,560 +1,281 @@
 <!DOCTYPE html>
-
 <html>
-
 <head>
-
 <title>jsMC1000 - JavaScript CCE MC-1000 emulator</title>
-
 <style type="text/css">
-
 #screen {
-
 	border: 1px solid gray;
-
 	background-color: silver;
-
 }
-
-
 
 #keyboard button {
-
 	font-family: Arial Narrow, sans-serif;
-
 	font-weight: bold;
-
 }
-
-
 
 #keyboard rt {
-
 	font-family: Arial, sans-serif;
-
 	font-weight: bold;
-
 }
-
-
 
 #keyboard .charKey {
-
 	font-family: Arial, sans-serif;
-
 	width: 2em;
-
 }
-
-
 
 #keyboard label {
-
 	font-family: Arial Narrow, sans-serif;
-
 	font-weight: bold;
-
 	font-size: smaller;
-
 	background-color: silver;
-
 	border: 2px outset;
-
 }
-
 </style>
 
-
-
 <script type="text/javascript" src="MC1000.js"></script>
-
 <script type="text/javascript" src="MC1000Core.js"></script>
-
 <script type="text/javascript" src="MC6847.js"></script>
-
 <script type="text/javascript" src="MC6847EnsjoMod.js"></script>
 
-
-
 <!-- Z80 emulation based on jsMSX. -->
-
 <!-- http://jsmsx.sourceforge.net/ -->
-
 <script type="text/javascript" src="z80.js"></script>  
-
 <script type="text/javascript" src="Z80_.js"></script>  
 
-
-
 <!-- AY-3-8910 emulation based on T'SoundSystem. -->
-
 <!-- http://code.google.com/p/tss/ -->
-
 <script type="text/javascript" src="Log.js"></script>
-
 <script type="text/javascript" src="AudioLooper.js"></script>
-
 <script type="text/javascript" src="BiquadFilterChannel.js"></script>
-
 <script type="text/javascript" src="MasterChannel.js"></script>
-
 <script type="text/javascript" src="PsgDeviceChannel.js"></script>
-
 <script type="text/javascript" src="AY38910.js"></script>
 
-
-
 <script type="text/javascript" src="Memory.js"></script>
-
 <script type="text/javascript" src="MC1000Keyboard.js"></script>
-
 <script type="text/javascript">
-
 var mc1000;
 
-
-
 var mc1000HtmlDelegate = {
-
 	getCanvas: function() {
-
 		return document.getElementById("screen");
-
 	},
-
 	getKeyboardMapping: function() {
-
 		return parseInt(document.getElementById("keyboardMapping").value);
-
 	},
-
 	getScreenLinesPerInterrupt: function() {
-
 		return parseInt(document.getElementById("screenLinesPerInterrupt").value);
-
 	},
-
 	getBuiltIn64kbRam: function() {
-
 		return document.getElementById("builtIn64kbRam").checked;
-
 	},
-
 	log: function(str) {
-
 		document.getElementById("logBuffer").value += str;
-
 	},
-
 	print: function(str) {
-
 		document.getElementById("printerOutput").value += str;
-
 	}
-
 };
 
-
-
 function mc1000Init() {
-
 	mc1000 = new MC1000(mc1000HtmlDelegate);
-
 }
-
-
 
 function mc1000Start() {
-
 	document.getElementById("keyboardEventsReceiver").onkeydown = function(event){ return mc1000.onkeydown(event); };
-
 	document.getElementById("keyboardEventsReceiver").onkeyup = function(event){ return mc1000.onkeyup(event); };
-
 	mc1000.executeStart();
-
 	document.getElementById("start").disabled = true;
-
 	document.getElementById("stop").disabled = false;
-
-	document.getElementById("reset").disabled = true;
-
+	document.getElementById("reset").disabled = false;
 }
-
-
 
 function mc1000Stop() {
-
 	window.onkeydown = null;
-
 	window.onkeyup = null;
-
 	mc1000.executeStop();
-
 	document.getElementById("start").disabled = false;
-
 	document.getElementById("stop").disabled = true;
-
+	document.getElementById("reset").disabled = true;
 }
-
-
 
 function mc1000Reset() {
-
 	mc1000.reset();
-
 }
-
 </script>
-
 </head>
 
-
-
 <body onload="mc1000Init()">
-
-
-
 <form onsubmit="return false" style="text-align: center">
-
-
 
 <h1>jsMC1000</h1>
 
-
-
 <p>
-
 	JavaScript <strong>CCE MC-1000</strong> emulator.
-
 	<br />
-
 	(Info: <a href="http://pt.wikipedia.org/wiki/CCE_MC-1000">Portuguese Wikipedia</a>,
-
 	<a href="https://sites.google.com/site/ccemc1000">Brazilian website</a>.)
-
 	<br />
-
 	Emerson Jos&eacute; Silveira da Costa &mdash;
-
 	emerson.costa<!-- NO SPAM! -->&#64;<!-- NO SPAM! -->gmail.com.
-
 	<br />
-
 	First released 2012-06-06.
-
 	<br />
-
 	Z80 emulation based on <strong>jsMSX</strong> &mdash;
-
 	<a href="http://jsmsx.sourceforge.net/" target="_blank">
-
 	http://jsmsx.sourceforge.net/</a>.
-
 	<br />
-
 	AY-3-8910 emulation based on <strong>T'Sound System</strong> &mdash;
-
 	<a href="http://code.google.com/p/tss/" target="_blank">
-
 	http://code.google.com/p/tss/</a>.
-
 </p>
 
-
-
 <fieldset>
-
 	<legend>Screen:</legend>
-
 	<canvas id="screen" width="320" height="242"
-
 		onclick="document.getElementById('keyboardEventsReceiver').focus()">
-
-		<strong style="color: red">Your browser does not support the
-
-		<tt>&lt;canvas&gt;</tt> HTML5 element.
-
+		<span style="font-weight:bold; color:red">
+		Your browser does not support the
+		<code>&lt;canvas&gt;</code> HTML5 element.
 		<br />
-
-		jsMC1000's screen cannot be displayed.</strong>
-
+		jsMC1000's screen cannot be displayed.</span>
 	</canvas>
-
 	<br />
-
 	<input type="text" id="keyboardEventsReceiver" value="Focus here to type." />
-
 </fieldset>
 
-
-
 <fieldset>
-
 <legend>Commands:</legend>
-
 <button id="start" onclick="mc1000Start()">start</button>
-
-<button id="stop" onclick="mc1000Stop()" disabled="true">pause</button>
-
-<button id="reset" onclick="mc1000Reset()">reset</button>
-
+<button id="stop" onclick="mc1000Stop()" disabled="disabled">pause</button>
+<button id="reset" onclick="mc1000Reset()" disabled="disabled">reset</button>
 </fieldset>
 
-
-
 <fieldset>
-
 <legend>Setup:</legend>
-
 <span style="white-space: nowrap">
-
 <input id="builtIn64kbRam" type="checkbox" value="1" checked="checked" />
-
 <label for="builtIn64kbRam">Built-in 64KB RAM.</label>
-
 </span>
 
-
-
 <span style="white-space: nowrap">
-
 <input id="useMC6847EnsjoMod" type="checkbox" value="1" checked="checked" />
-
 <label for="useMC6847EnsjoMod">Use MC6847 Ensjo mod.</label>
-
 </span>
 
-
-
 <span style="white-space: nowrap">
-
 <label for="keyboardMapping">Keyboard mapping:</label>
-
 <select id="keyboardMapping">
-
 	<option value="0">1-to-1 mapping (US keyboard)</option>
-
 	<option value="1">PC-friendly (US keyboard)</option>
-
 	<option value="2" selected="selected">PC-friendly (ABNT-2 keyboard)</option>
-
 </select>
-
 </span>
 
-
-
 <span style="white-space: nowrap">
-
 <label for="screenLinesPerInterrupt">Screen lines per interrupt:</label>
-
 <select id="screenLinesPerInterrupt">
-
 	<option value="1">1</option>
-
 	<option value="6">6 (1/2 char row)</option>
-
 	<option value="12">12 (1 char rows)</option>
-
-	<option value="48" selected="true">48 (4 char rows, 1/4 screen)</option>
-
+	<option value="48" selected="selected">48 (4 char rows, 1/4 screen)</option>
 	<option value="64">64 (5 1/3 char rows, 1/3 screen)</option>
-
 	<option value="96">96 (8 char rows, 1/2 screen)</option>
-
 	<option value="192">192 (16 char rows, full screen)</option>
-
 </select>
-
 </span>
-
-
 
 <span style="white-space: nowrap">
-
 <label for="soundBufferSize">Sound buffer size:</label>
-
 <select id="soundBufferSize">
-
 	<option value="256">256</option>
-
 	<option value="512">512</option>
-
 	<option value="1024">1024</option>
-
 	<option value="2048">2048</option>
-
-	<option value="4096" selected="true">4096</option>
-
+	<option value="4096" selected="selected">4096</option>
 </select>
-
 </span>
-
 </fieldset>
-
-
 
 <fieldset>
-
 <legend>BASIC program:</legend>
-
 <textarea id="basicProgram" cols="80" rows="10"></textarea>
-
 <br />
-
 <button onclick="document.getElementById('basicProgram').value = mc1000.getBasicProgram()">Extract program</button>
-
 <button onclick="mc1000.setBasicProgram(document.getElementById('basicProgram').value)">Inject program</button>
-
 </fieldset>
-
-
 
 <fieldset id="keyboard">
-
 <legend>Keyboard (NOT FUNCTIONAL YET):</legend>
-
-<ruby><button class="charKey">1</button><rt>!</rt></ruby>
-
+<ruby><button id="k1" class="charKey" onmousedown="console.log(this.id)" onmouseup="console.log(this.id)">1</button><rt>!</rt></ruby>
 <ruby><button class="charKey">2</button><rt>"</rt></ruby>
-
 <ruby><button class="charKey">3</button><rt>#</rt></ruby>
-
 <ruby><button class="charKey">4</button><rt>$</rt></ruby>
-
 <ruby><button class="charKey">5</button><rt>%</rt></ruby>
-
 <ruby><button class="charKey">6</button><rt>&amp;</rt></ruby>
-
 <ruby><button class="charKey">7</button><rt>'</rt></ruby>
-
 <ruby><button class="charKey">8</button><rt>(</rt></ruby>
-
 <ruby><button class="charKey">9</button><rt>)</rt></ruby>
-
 <button class="charKey">0</button>
-
 <ruby><button class="charKey">-</button><rt>=</rt></ruby>
-
 <button class="charKey">@</button>
-
 <button>RESET</button>
-
 <br />
-
 <ruby><button class="charKey">Q</button><rt>STOP</rt></ruby>
-
 <ruby><button class="charKey">W</button><rt>LOAD</rt></ruby>
-
 <ruby><button class="charKey">E</button><rt>PEEK</rt></ruby>
-
 <ruby><button class="charKey">R</button><rt>RUN</rt></ruby>
-
 <ruby><button class="charKey">T</button><rt>TLOAD</rt></ruby>
-
 <ruby><button class="charKey">Y</button><rt>PLOT</rt></ruby>
-
 <ruby><button class="charKey">U</button><rt>SAVE</rt></ruby>
-
 <ruby><button class="charKey">I</button><rt>INPUT</rt></ruby>
-
 <ruby><button class="charKey">O</button><rt>CONT</rt></ruby>
-
 <ruby><button class="charKey">P</button><rt>PRINT</rt></ruby>
-
 <button class="charKey">&uarr;</button>
-
 <button>RETURN</button>
-
 <br />
-
 <ruby><button class="charKey">A</button><rt>READ</rt></ruby>
-
 <ruby><button class="charKey">S</button><rt>STEP</rt></ruby>
-
 <ruby><button class="charKey">D</button><rt>DATA</rt></ruby>
-
 <ruby><button class="charKey">F</button><rt>FOR</rt></ruby>
-
 <ruby><button class="charKey">G</button><rt>GOTO</rt></ruby>
-
 <ruby><button class="charKey">H</button><rt>HOME</rt></ruby>
-
 <ruby><button class="charKey">J</button><rt>THEN</rt></ruby>
-
 <ruby><button class="charKey">K</button><rt>POKE</rt></ruby>
-
 <ruby><button class="charKey">L</button><rt>LIST</rt></ruby>
-
 <ruby><button class="charKey">;</button><rt>+</rt></ruby>
-
 <ruby><button class="charKey">:</button><rt>*</rt></ruby>
-
 <label for="ctrlPressed">CTRL
-
 <input id="ctrlPressed" type="checkbox" value="1" />
-
 </label>
-
 <br />
-
 <input id="shiftPressed" type="checkbox" value="1" />
-
 <button>SHIFT</button>
-
 <ruby><button class="charKey">Z</button><rt>RETURN</rt></ruby>
-
 <ruby><button class="charKey">X</button><rt>NEXT</rt></ruby>
-
 <ruby><button class="charKey">C</button><rt>CLEAR</rt></ruby>
-
 <ruby><button class="charKey">V</button><rt>RESTORE</rt></ruby>
-
 <ruby><button class="charKey">B</button><rt>GOSUB</rt></ruby>
-
 <ruby><button class="charKey">N</button><rt>SOUND</rt></ruby>
-
 <ruby><button class="charKey">M</button><rt>DIM</rt></ruby>
-
 <ruby><button class="charKey">,</button><rt>&lt;</rt></ruby>
-
 <ruby><button class="charKey">.</button><rt>&gt;</rt></ruby>
-
 <ruby><button class="charKey">/</button><rt>?</rt></ruby>
-
 <button>RUBOUT</button>
-
 <button>SPACE</button>
-
 </fieldset>
 
-
-
 <fieldset>
-
 <legend>Printer output:</legend>
-
 <textarea id="printerOutput" cols="80" rows="10"></textarea>
-
 </fieldset>
-
-
 
 <fieldset>
-
 <legend>Log buffer:</legend>
-
 <textarea id="logBuffer" cols="80" rows="10"></textarea>
-
 </fieldset>
-
-
 
 </form>
 
-
-
 </body>
-
 </html>
-
