@@ -23,7 +23,12 @@ MC1000.prototype.executeStart = function() {
 	}
 	
 	// https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#webaudio
-	this.looper.audioContext.resume().then(function(){console.log('Playback resumed successfully.')});
+	try {
+		this.looper.audioContext.resume().then(function(){console.log('Playback resumed successfully.')});
+	} catch(e) {
+		// Ignore exception.
+		console.log(e);
+	}
 	
 	this.core.executeStart();
 };

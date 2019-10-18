@@ -183,7 +183,7 @@ MC1000Keyboard.prototype.keyAction = function(event) {
 			this.pcKeys.splice(i, 1);
 		}
 	}
-	this.delegate.mc1000KeyboardLog("["+this.pcKeys.join(",")+"]");
+	// this.delegate.mc1000KeyboardLog("["+this.pcKeys.join(",")+"]");
 	
 	// Now let's build the corresponding set of mapped MC-1000 keys.
 	
