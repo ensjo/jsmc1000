@@ -266,7 +266,7 @@ MC1000.prototype.getBasicProgram = function() {
 			case "REM":
 			case "SAVE":
 			case "LOAD" :
-				state = stateChar;
+				state = stateREM;
 				break;
 			}
 		} else {
@@ -281,32 +281,24 @@ MC1000.prototype.getBasicProgram = function() {
 		}
 	};
 	
+	
 	var stateDATA = function() {
-		// Handles characters between data items in a DATA instruction: spaces, commas...
-		stateStringOrChar();
-		switch (c) {
+		// Handles start of DATA instruction: Heading space.
+		switch(c) {
 		case " ":
-		case ",":
-			// Space or comma don't change the strategy.
-			break;
-		case ":":
-			// End of DATA instruction.
-			state = stateToken;
+			// Space found: Output hexadecimal notation to mark start of actual data.
+			program += "~20";
+			state = stateDATA2;
 			break;
 		default:
-			// Data item found.
-			state = stateDATA2;
+			(state = stateDATA2)();
 		}
 	};
 	
 	var stateDATA2 = function() {
-		// Handles data item in DATA instruction.
+		// Handles data item in DATA instruction: Spaces after any first character are output unescaped.
 		stateStringOrChar();
 		switch (c) {
-		case ",":
-			// Back to handling characters between data items.
-			state = stateDATA;
-			break;
 		case ":":
 			// End of DATA instruction.
 			state = stateToken;
@@ -314,6 +306,19 @@ MC1000.prototype.getBasicProgram = function() {
 		}
 	};
 	
+	var stateREM = function() {
+		// Handles start of REM, SAVE or LOAD instructions: Heading space.
+		switch(c) {
+		case " ":
+			// Space found: Output hexadecimal notation to mark start of actual data.
+			program += "~20";
+			state = stateChar; // Output rest of line. Spaces after any first character are output unescaped.
+			break;
+		default:
+			(state = stateChar)(); // Output rest of line. Spaces after any first character are output unescaped.
+		}
+	};
+
 	var stateStringOrChar = function() {
 		// Identifies start of string.
 		stateChar();
@@ -325,7 +330,7 @@ MC1000.prototype.getBasicProgram = function() {
 			state = stateString;
 			break;
 		}
-	};
+	};	
 	
 	var stateString = function() {
 		// Handles string content until ending quotes are found.
@@ -432,47 +437,23 @@ MC1000.prototype.setBasicProgram = function(program) {
 	};
 	
 	var stateDATA = function() {
-		// Handles start of DATA instruction: Discards first space, if any.
+		// Handles start of DATA instruction: Discards heading unescaped spaces, if any.
 		switch (c) {
 		case " ":
-			// Discards first space after "DATA" word.
+			// Discards heading unescaped spaces after "DATA" word.
 			k--;
-			state = stateDATA2;
 			break;
 		default:
-			state = stateDATA2;
-			stateDATA2();
+			// Escaped spaces or any other character marks start of actual data.
+			(state = stateDATA2)();
 			break;
 		}
 	};
 	
 	var stateDATA2 = function() {
-		// Handles characters between items of data in DATA instruction: spaces, commas...
-		stateChar();
-		switch (c) {
-		case " ":
-		case ",":
-			// Space or comma don't change the strategy.
-			break;
-		case ":":
-			// End of DATA instruction.
-			state = stateToken;
-			break;
-		default:
-			// item of data found.
-			state = stateDATA3;
-			break;
-		}
-	};
-	
-	var stateDATA3 = function() {
-		// Handles data item in DATA instruction.
+		// Handles data item in DATA instruction. Unescaped spaces after the first non-space character are output unescaped.
 		stateStringOrChar();
 		switch (c) {
-		case ",":
-			// Back to handling characters between items of data.
-			state = stateDATA2;
-			break;
 		case ":":
 			// End of DATA instruction.
 			state = stateToken;
@@ -481,15 +462,15 @@ MC1000.prototype.setBasicProgram = function(program) {
 	};
 	
 	var stateREM = function() {
-		// Handles start of REM/SAVE/LOAD instruction: Discards first space, if any.
+		// Handles start of REM/SAVE/LOAD instruction: Discards heading unescaped spaces, if any.
 		switch (c) {
 		case " ":
 			// Discards first space after REM/SAVE/LOAD.
 			k--;
 			break;
 		default:
-			state = stateChar;
-			stateChar();
+			// Output rest of line.
+			(state = stateChar)();
 			break;
 		}
 	};
