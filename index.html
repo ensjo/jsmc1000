@@ -56,28 +56,34 @@
 <script type="text/javascript">
 var mc1000;
 
-var mc1000HtmlDelegate = {
-	getCanvas: function() {
-		return document.getElementById("screen");
-	},
-	getKeyboardMapping: function() {
-		return parseInt(document.getElementById("keyboardMapping").value);
-	},
-	getScreenLinesPerInterrupt: function() {
-		return parseInt(document.getElementById("screenLinesPerInterrupt").value);
-	},
-	getBuiltIn64kbRam: function() {
-		return document.getElementById("builtIn64kbRam").checked;
-	},
-	log: function(str) {
-		console.log(str);
-	},
-	print: function(str) {
-		document.getElementById("printerOutput").value += str;
-	}
-};
-
 function mc1000Init() {
+	var screenElement = document.getElementById("screen");
+	var keyboardMappingElement = document.getElementById("keyboardMapping");
+	var screenLinesPerInterruptElement = document.getElementById("screenLinesPerInterrupt");
+	var builtIn64kbRamElement = document.getElementById("builtIn64kbRam");
+	var printerOutputElement = document.getElementById("printerOutput");
+	
+	var mc1000HtmlDelegate = {
+		getCanvas: function() {
+			return screenElement;
+		},
+		getKeyboardMapping: function() {
+			return parseInt(keyboardMappingElement.value);
+		},
+		getScreenLinesPerInterrupt: function() {
+			return parseInt(screenLinesPerInterruptElement.value);
+		},
+		getBuiltIn64kbRam: function() {
+			return builtIn64kbRamElement.checked;
+		},
+		log: function(str) {
+			console.log(str);
+		},
+		print: function(str) {
+			printerOutputElement.value += str;
+		}
+	};
+
 	mc1000 = new MC1000(mc1000HtmlDelegate);
 }
 
@@ -265,7 +271,7 @@ function mc1000Reset() {
 </fieldset>
 
 <!--
-A ideia é depois criar uma pseudo-placa de impressora e fazê-la exibir as impressões aqui: 
+A ideia ï¿½ depois criar uma pseudo-placa de impressora e fazï¿½-la exibir as impressï¿½es aqui: 
 <fieldset>
 <legend>Printer output:</legend>
 <textarea id="printerOutput" cols="80" rows="10" disabled="disabled"></textarea>
