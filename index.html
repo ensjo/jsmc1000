@@ -55,34 +55,50 @@
 <script type="text/javascript" src="MC1000Keyboard.js"></script>
 <script type="text/javascript">
 var mc1000;
+var mc1000HtmlDelegate;
 
 function mc1000Init() {
-	var screenElement = document.getElementById("screen");
-	var keyboardMappingElement = document.getElementById("keyboardMapping");
-	var screenLinesPerInterruptElement = document.getElementById("screenLinesPerInterrupt");
-	var builtIn64kbRamElement = document.getElementById("builtIn64kbRam");
-	var printerOutputElement = document.getElementById("printerOutput");
-	
-	var mc1000HtmlDelegate = {
+	mc1000HtmlDelegate = {
+		screenElement: document.getElementById("screen"),
 		getCanvas: function() {
-			return screenElement;
+			return this.screenElement;
+		},
+		keyboardMapping: 0,
+		keyboardMappingElement: document.getElementById("keyboardMapping"),
+		updateKeyboardMapping: function() {
+			this.keyboardMapping = this.keyboardMappingElement.selectedIndex;
 		},
 		getKeyboardMapping: function() {
-			return parseInt(keyboardMappingElement.value);
+			return this.keyboardMapping;
+		},
+		screenLinesPerInterrupt: 0,
+		screenLinesPerInterruptElement: document.getElementById("screenLinesPerInterrupt"),
+		updateScreenLinesPerInterrupt: function() {
+			this.screenLinesPerInterrupt = parseInt(this.screenLinesPerInterruptElement.value);
 		},
 		getScreenLinesPerInterrupt: function() {
-			return parseInt(screenLinesPerInterruptElement.value);
+			return this.screenLinesPerInterrupt;
+		},
+		builtIn64kbRam: false,
+		builtIn64kbRamElement: document.getElementById("builtIn64kbRam"),
+		updateBuiltIn64kbRam: function() {
+			this.builtIn64kbRam = this.builtIn64kbRamElement.checked;
 		},
 		getBuiltIn64kbRam: function() {
-			return builtIn64kbRamElement.checked;
+			return this.builtIn64kbRam;
 		},
 		log: function(str) {
 			console.log(str);
 		},
+		printerOutputElement: document.getElementById("printerOutput"),
 		print: function(str) {
-			printerOutputElement.value += str;
+			this.printerOutputElement.value += str;
 		}
 	};
+	
+	mc1000HtmlDelegate.updateKeyboardMapping();
+	mc1000HtmlDelegate.updateScreenLinesPerInterrupt();
+	mc1000HtmlDelegate.updateBuiltIn64kbRam();
 
 	mc1000 = new MC1000(mc1000HtmlDelegate);
 }
@@ -160,7 +176,7 @@ function mc1000Reset() {
 <fieldset>
 <legend>Setup:</legend>
 <span style="white-space: nowrap">
-<input id="builtIn64kbRam" type="checkbox" value="1" checked="checked" disabled="disabled"/>
+<input id="builtIn64kbRam" type="checkbox" value="1" checked="checked" disabled="disabled" onchange="mc1000HtmlDelegate.updateBuiltIn64kbRam()" />
 <label for="builtIn64kbRam">Built-in 64KB RAM.</label>
 </span>
 
@@ -171,7 +187,7 @@ function mc1000Reset() {
 
 <span style="white-space: nowrap">
 <label for="keyboardMapping">Keyboard mapping:</label>
-<select id="keyboardMapping">
+<select id="keyboardMapping" onchange="mc1000HtmlDelegate.updateKeyboardMapping()">
 	<option value="0">1-to-1 mapping (US keyboard)</option>
 	<option value="1">PC-friendly (US keyboard)</option>
 	<option value="2" selected="selected">PC-friendly (ABNT-2 keyboard)</option>
@@ -180,7 +196,7 @@ function mc1000Reset() {
 
 <span style="white-space: nowrap">
 <label for="screenLinesPerInterrupt">Screen lines per interrupt:</label>
-<select id="screenLinesPerInterrupt">
+<select id="screenLinesPerInterrupt" onchange="mc1000HtmlDelegate.updateScreenLinesPerInterrupt()">
 	<option value="1">1</option>
 	<option value="6">6 (1/2 char row)</option>
 	<option value="12">12 (1 char rows)</option>
