@@ -1,762 +1,424 @@
 /**
-
  * jsMC1000 - MC-1000 emulator in JavaScript.
-
  * Emerson Jose Silveira da Costa <emerson.costa@gmail.com>, alias "Ensjo".
-
  * http://ensjo.net/mc-1000/jsmc1000
-
  */
-
-
 
 /**
-
  * MC6847 class.
-
  * 2011-11-09.
-
  * 
-
  * Emulation of Motorola MC6847 Video Display Generator.
-
  * 
-
  * ¬A/G ¬A/S ¬INT/EXT INV GM2 GM1 GM0 MODE
-
  *   0    0      0     0   X   X   X  Internal Alphanumerics
-
  *   0    0      0     1   X   X   X  Internal Alphanumerics Inverted
-
  *   0    0      1     0   X   X   X  External Alphanumerics
-
  *   0    0      1     1   X   X   X  External Alphanumerics Inverted
-
  *   0    1      0     X   X   X   X  Semigraphics 4 (SG4)
-
  *   0    1      1     X   X   X   X  Semigraphics 6 (SG6)
-
  *   1    X      X     X   0   0   0  64x64 Color Graphics One (CG1)
-
  *   1    X      X     X   0   0   1  128X64 Resolution Graphics One (RG1)
-
  *   1    X      X     X   0   1   0  128x64 Color Graphics Two (CG2)
-
  *   1    X      X     X   0   1   1  128x96 Resolution Graphics Two (RG2)
-
  *   1    X      X     X   1   0   0  128x96 Color Graphics Three (CG3)
-
  *   1    X      X     X   1   0   1  128x192 Resolution Graphics Three (RG3)
-
  *   1    X      X     X   1   1   0  128x192 Color Graphics Six (CG6)
-
  *   1    X      X     X   1   1   1  256x192 Resolution Graphics Six (RG6)
-
  * 
-
  * CSS specifies alternative palettes.
-
  */
 
-
-
 function MC6847(delegate) {
-
 	this.delegate = delegate;
-
 	
-
 	// Pins.
-
 	this.da = 0; // DA0~DA12 (Display Address Output Lines).
-
 	this.dd = 0; // DD0~DD7 (Data Input Lines).
-
 	this.ag = 0; // ¬A/G (Alphanumerics/Graphics).
-
 	this.as = 0; // ¬A/S (Alphanumerics/Semigraphics).
-
 	this.intext = 0; // ¬INT/EXT (Internal/External).
-
 	this.inv = 0; // INV (Invert).
-
 	this.gm = 0; // GM0~GM2 (Graphic Mode).
-
 	this.css = 0; // CSS (Color Select).
-
 	
-
 	this.ms = 1; // ¬MS (Memory Select).
-
 	this.fs = 0; // FS (Field Sinc).
-
 	this.rp = 1; // RP (Row Preset).
-
 	
-
 	this.lineCounter = 0;
-
 	this.rowCounter = 0;
-
+	
+	this.borderColor = MC6847.COLOR.BLACK;
 }
 
-
-
 MC6847.FONT = [
-
 	[0x00,0x00,0x00,0x1c,0x22,0x02,0x1a,0x2a,0x2a,0x1c,0x00,0x00], // @
-
 	[0x00,0x00,0x00,0x08,0x14,0x22,0x22,0x3e,0x22,0x22,0x00,0x00], // A
-
 	[0x00,0x00,0x00,0x3c,0x12,0x12,0x1c,0x12,0x12,0x3c,0x00,0x00], // B
-
 	[0x00,0x00,0x00,0x1c,0x22,0x20,0x20,0x20,0x22,0x1c,0x00,0x00], // C
-
 	[0x00,0x00,0x00,0x3c,0x12,0x12,0x12,0x12,0x12,0x3c,0x00,0x00], // D
-
 	[0x00,0x00,0x00,0x3e,0x20,0x20,0x3c,0x20,0x20,0x3e,0x00,0x00], // E
-
 	[0x00,0x00,0x00,0x3e,0x20,0x20,0x3c,0x20,0x20,0x20,0x00,0x00], // F
-
 	[0x00,0x00,0x00,0x1e,0x20,0x20,0x26,0x22,0x22,0x1e,0x00,0x00], // G
-
 	[0x00,0x00,0x00,0x22,0x22,0x22,0x3e,0x22,0x22,0x22,0x00,0x00], // H
-
 	[0x00,0x00,0x00,0x1c,0x08,0x08,0x08,0x08,0x08,0x1c,0x00,0x00], // I
-
 	[0x00,0x00,0x00,0x02,0x02,0x02,0x02,0x02,0x22,0x1c,0x00,0x00], // J
-
 	[0x00,0x00,0x00,0x22,0x24,0x28,0x30,0x28,0x24,0x22,0x00,0x00], // K
-
 	[0x00,0x00,0x00,0x20,0x20,0x20,0x20,0x20,0x20,0x3e,0x00,0x00], // L
-
 	[0x00,0x00,0x00,0x22,0x36,0x2a,0x2a,0x22,0x22,0x22,0x00,0x00], // M
-
 	[0x00,0x00,0x00,0x22,0x32,0x2a,0x26,0x22,0x22,0x22,0x00,0x00], // N
-
 	[0x00,0x00,0x00,0x3e,0x22,0x22,0x22,0x22,0x22,0x3e,0x00,0x00], // O
-
 	[0x00,0x00,0x00,0x3c,0x22,0x22,0x3c,0x20,0x20,0x20,0x00,0x00], // P
-
-	[0x00,0x00,0x00,0x1c,0x22,0x22,0x22,0x2a,0x24,0x1a,0x00,0x00], // Q
-
+	[0x00,0x00,0x00,0x1c,0x22,0x22,0x22,0x2a,0x24,0x18,0x00,0x00], // Q
 	[0x00,0x00,0x00,0x3c,0x22,0x22,0x3c,0x28,0x24,0x22,0x00,0x00], // R
-
 	[0x00,0x00,0x00,0x1c,0x22,0x10,0x08,0x04,0x22,0x1c,0x00,0x00], // S
-
 	[0x00,0x00,0x00,0x3e,0x08,0x08,0x08,0x08,0x08,0x08,0x00,0x00], // T
-
 	[0x00,0x00,0x00,0x22,0x22,0x22,0x22,0x22,0x22,0x1c,0x00,0x00], // U
-
 	[0x00,0x00,0x00,0x22,0x22,0x22,0x14,0x14,0x08,0x08,0x00,0x00], // V
-
 	[0x00,0x00,0x00,0x22,0x22,0x22,0x2a,0x2a,0x36,0x22,0x00,0x00], // W
-
 	[0x00,0x00,0x00,0x22,0x22,0x14,0x08,0x14,0x22,0x22,0x00,0x00], // X
-
 	[0x00,0x00,0x00,0x22,0x22,0x14,0x08,0x08,0x08,0x08,0x00,0x00], // Y
-
 	[0x00,0x00,0x00,0x3e,0x02,0x04,0x08,0x10,0x20,0x3e,0x00,0x00], // Z
-
 	[0x00,0x00,0x00,0x38,0x20,0x20,0x20,0x20,0x20,0x38,0x00,0x00], // [
-
 	[0x00,0x00,0x00,0x20,0x20,0x10,0x08,0x04,0x02,0x02,0x00,0x00], // \
-
 	[0x00,0x00,0x00,0x0e,0x02,0x02,0x02,0x02,0x02,0x0e,0x00,0x00], // ]
-
 	[0x00,0x00,0x00,0x08,0x1c,0x2a,0x08,0x08,0x08,0x08,0x00,0x00], // (up arrow)
-
 	[0x00,0x00,0x00,0x00,0x08,0x10,0x3e,0x10,0x08,0x00,0x00,0x00], // (left arrow)
-
 	[0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00], // (space)
-
 	[0x00,0x00,0x00,0x08,0x08,0x08,0x08,0x08,0x00,0x08,0x00,0x00], // !
-
 	[0x00,0x00,0x00,0x14,0x14,0x00,0x00,0x00,0x00,0x00,0x00,0x00], // "
-
 	[0x00,0x00,0x00,0x14,0x14,0x36,0x00,0x36,0x14,0x14,0x00,0x00], // #
-
 	[0x00,0x00,0x00,0x08,0x1e,0x20,0x1c,0x02,0x3c,0x08,0x00,0x00], // $
-
 	[0x00,0x00,0x00,0x32,0x32,0x04,0x08,0x10,0x26,0x26,0x00,0x00], // %
-
 	[0x00,0x00,0x00,0x10,0x28,0x28,0x10,0x2a,0x24,0x1a,0x00,0x00], // &
-
 	[0x00,0x00,0x00,0x18,0x18,0x18,0x00,0x00,0x00,0x00,0x00,0x00], // '
-
 	[0x00,0x00,0x00,0x08,0x10,0x20,0x20,0x20,0x10,0x08,0x00,0x00], // (
-
 	[0x00,0x00,0x00,0x08,0x04,0x02,0x02,0x02,0x04,0x08,0x00,0x00], // )
-
 	[0x00,0x00,0x00,0x00,0x08,0x1c,0x3e,0x1c,0x08,0x00,0x00,0x00], // *
-
 	[0x00,0x00,0x00,0x00,0x08,0x08,0x3e,0x08,0x08,0x00,0x00,0x00], // +
-
 	[0x00,0x00,0x00,0x00,0x00,0x00,0x30,0x30,0x10,0x20,0x00,0x00], // ,
-
 	[0x00,0x00,0x00,0x00,0x00,0x00,0x3e,0x00,0x00,0x00,0x00,0x00], // -
-
 	[0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x30,0x30,0x00,0x00], // .
-
 	[0x00,0x00,0x00,0x02,0x02,0x04,0x08,0x10,0x20,0x20,0x00,0x00], // /
-
 	[0x00,0x00,0x00,0x18,0x24,0x24,0x24,0x24,0x24,0x18,0x00,0x00], // 0
-
 	[0x00,0x00,0x00,0x08,0x18,0x08,0x08,0x08,0x08,0x1c,0x00,0x00], // 1
-
 	[0x00,0x00,0x00,0x1c,0x22,0x02,0x1c,0x20,0x20,0x3e,0x00,0x00], // 2
-
 	[0x00,0x00,0x00,0x1c,0x22,0x02,0x1c,0x02,0x22,0x1c,0x00,0x00], // 3
-
 	[0x00,0x00,0x00,0x04,0x0c,0x14,0x3e,0x04,0x04,0x04,0x00,0x00], // 4
-
 	[0x00,0x00,0x00,0x3e,0x20,0x3c,0x02,0x02,0x22,0x1c,0x00,0x00], // 5
-
 	[0x00,0x00,0x00,0x1c,0x20,0x20,0x3c,0x22,0x22,0x1c,0x00,0x00], // 6
-
 	[0x00,0x00,0x00,0x3e,0x02,0x04,0x08,0x10,0x20,0x20,0x00,0x00], // 7
-
 	[0x00,0x00,0x00,0x1c,0x22,0x22,0x1c,0x22,0x22,0x1c,0x00,0x00], // 8
-
 	[0x00,0x00,0x00,0x1c,0x22,0x22,0x1e,0x02,0x02,0x1c,0x00,0x00], // 9
-
 	[0x00,0x00,0x00,0x00,0x18,0x18,0x00,0x18,0x18,0x00,0x00,0x00], // :
-
 	[0x00,0x00,0x00,0x18,0x18,0x00,0x18,0x18,0x08,0x10,0x00,0x00], // ;
-
 	[0x00,0x00,0x00,0x04,0x08,0x10,0x20,0x10,0x08,0x04,0x00,0x00], // <
-
 	[0x00,0x00,0x00,0x00,0x00,0x3e,0x00,0x3e,0x00,0x00,0x00,0x00], // =
-
 	[0x00,0x00,0x00,0x10,0x08,0x04,0x02,0x04,0x08,0x10,0x00,0x00], // >
-
 	[0x00,0x00,0x00,0x18,0x24,0x04,0x08,0x08,0x00,0x08,0x00,0x00], // ?
-
 ];
 
+MC6847.COLOR = (function() {
+	var colorDataArray = [
+		//  R,   G,   B,   A.
+		[0x07,0xff,0x00,0xff], // Green
+		[0xff,0xff,0x00,0xff], // Yellow.
+		[0x3b,0x08,0xff,0xff], // Blue.
+		[0xcc,0x00,0x3b,0xff], // Red.
+		[0xff,0xff,0xff,0xff], // Buff.
+		[0x07,0xe3,0x99,0xff], // Cyan.
+		[0xff,0x1c,0xff,0xff], // Magenta.
+		[0xff,0x81,0x00,0xff], // Orange.
+		[0x00,0x00,0x00,0xff], // Black.
+		[0x00,0x7c,0x00,0xff], // Dark green.
+		[0x91,0x00,0x00,0xff]  // Dark red.
+	];
+	var imageDataArray = [];
+	
+	for(var i in colorDataArray) {
+		var id = new ImageData(1, 1); // 1 pixel.
+		for (var j = 0; j < 4; j++) {
+			id.data[j] = colorDataArray[i][j];
+		}
+		imageDataArray[i] = id;
+	}
+	
+	return imageDataArray;
+})();
 
-
-/*
-
-MC6847.COLOR = {
-
-	BLACK: "#000000",
-
-
-
-	GREEN: "#00ff00",
-
-	YELLOW: "#ffff00",
-
-	BLUE: "#0000ff",
-
-	RED: "#ff0000",
-
-
-
-	BUFF: "#ffffff",
-
-	CYAN: "#00ffff",
-
-	MAGENTA: "#ff00ff",
-
-	ORANGE: "#ff8000",
-
-
-
-	DARK_GREEN: "#008000",
-
-	DARK_RED:  "#800000"
-
-};
-
-*/
-
-
-
-MC6847.COLOR = {
-
-	BLACK: "#000000",
-
-
-
-	GREEN: "#07ff00",
-
-	YELLOW: "#ffff00",
-
-	BLUE: "#3b08ff",
-
-	RED: "#cc003b",
-
-
-
-	BUFF: "#ffffff",
-
-	CYAN: "#07e399",
-
-	MAGENTA: "#ff1cff",
-
-	ORANGE: "#ff8100",
-
-
-
-	DARK_GREEN: "#007c00",
-
-	DARK_RED:  "#910000"
-
-};
-
-
+MC6847.COLOR.GREEN      = MC6847.COLOR[0];
+MC6847.COLOR.YELLOW     = MC6847.COLOR[1];
+MC6847.COLOR.BLUE       = MC6847.COLOR[2];
+MC6847.COLOR.RED        = MC6847.COLOR[3];
+MC6847.COLOR.BUFF       = MC6847.COLOR[4];
+MC6847.COLOR.CYAN       = MC6847.COLOR[5];
+MC6847.COLOR.MAGENTA    = MC6847.COLOR[6];
+MC6847.COLOR.ORANGE     = MC6847.COLOR[7];
+MC6847.COLOR.BLACK      = MC6847.COLOR[8];
+MC6847.COLOR.DARK_GREEN = MC6847.COLOR[9];
+MC6847.COLOR.DARK_RED   = MC6847.COLOR[10];
 
 MC6847.PALETTE = {
-
 	RESOLUTION_GRAPHICS: [
-
 		[
-
 			MC6847.COLOR.DARK_GREEN,
-
 			MC6847.COLOR.GREEN
-
 		],
-
 		[
-
 			MC6847.COLOR.BLACK,
-
 			MC6847.COLOR.BUFF
-
 		]
-
 	],
-
 	
-
 	COLOR_GRAPHICS: [
-
 		[
-
 			MC6847.COLOR.GREEN,
-
 			MC6847.COLOR.YELLOW,
-
 			MC6847.COLOR.BLUE,
-
 			MC6847.COLOR.RED
-
 		],
-
 		[
-
 			MC6847.COLOR.BUFF,
-
 			MC6847.COLOR.CYAN,
-
 			MC6847.COLOR.MAGENTA,
-
 			MC6847.COLOR.ORANGE
-
 		]
-
 	],
-
-
 
 	SEMIGRAPHICS: [
-
 		MC6847.COLOR.GREEN,
-
 		MC6847.COLOR.YELLOW,
-
 		MC6847.COLOR.BLUE,
-
 		MC6847.COLOR.RED,
-
 		MC6847.COLOR.BUFF,
-
 		MC6847.COLOR.CYAN,
-
 		MC6847.COLOR.MAGENTA,
-
 		MC6847.COLOR.ORANGE
-
 	],
 
-
-
 	ALPHANUMERICS: [
-
 		[
-
 			MC6847.COLOR.DARK_GREEN,
-
 			MC6847.COLOR.GREEN
-
 		],
-
 		[
-
 			MC6847.COLOR.DARK_RED,
-
 			MC6847.COLOR.ORANGE
-
 		]
-
 	]
-
 };
-
-
 
 MC6847.VERTICAL_BORDER = 25;
-
 MC6847.HORIZONTAL_BORDER = 32;
 
-
+MC6847.SCREEN_WIDTH = MC6847.HORIZONTAL_BORDER + 256 + MC6847.HORIZONTAL_BORDER;
+MC6847.SCREEN_HEIGHT = MC6847.VERTICAL_BORDER + 192 + MC6847.VERTICAL_BORDER;
 
 MC6847.prototype.setup = function() {
-
 	this.bytesPerLine = 32;
-
 	this.bitsToParse = 8;
-
 	if (this.ag) {
-
 		// Graphic modes.
-
 		this.pattern = this.dd;
-
 		switch (this.gm) {
-
 			case 0: // 64x64 Color Graphics One (CG1)
-
 				this.palette = MC6847.PALETTE.COLOR_GRAPHICS[this.css ? 1 : 0];
-
 				this.borderColor = this.palette[0];
-
 				this.bytesPerLine = 16;
-
 				this.bitsPerPixel = 2;
-
 				this.pixelWidth = 4;
-
 				this.elementHeight = 3;
-
 				break;
-
 			case 1: // 128x64 Resolution Graphics One (RG1)
-
 			case 3: // 128x96 Resolution Graphics Two (RG2)
-
 			case 5: // 128x192 Resolution Graphics Three (RG3)
-
 				this.palette = MC6847.PALETTE.RESOLUTION_GRAPHICS[this.css ? 1 : 0];
-
 				this.borderColor = this.palette[1];
-
 				this.bytesPerLine = 16;
-
 				this.bitsPerPixel = 1;
-
 				this.pixelWidth = 2;
-
 				this.elementHeight = 3 - (this.gm >> 1);
-
 				break;
-
 			case 2: // 128x64 Color Graphics Two (CG2)
-
 			case 4: // 128x96 Color Graphics Three (CG3)
-
 			case 6: // 128x192 Color Graphics Six (CG6) 
-
 				this.palette = MC6847.PALETTE.COLOR_GRAPHICS[this.css ? 1 : 0];
-
 				this.borderColor = this.palette[0];
-
 				this.bitsPerPixel = 2;
-
 				this.pixelWidth = 2;
-
 				this.elementHeight = 4 - (this.gm >> 1);
-
 				break;
-
 			case 7: // 256x192 Resolution Graphics Six (RG6)
-
 			default:
-
 				this.palette = MC6847.PALETTE.RESOLUTION_GRAPHICS[this.css ? 1 : 0];
-
 				this.borderColor = this.palette[1];
-
 				this.bitsPerPixel = 1;
-
 				this.pixelWidth = 1;
-
 				this.elementHeight = 1;
-
 				break;
-
 		}
-
 	} else {
-
 		// Non-graphic modes.
-
 		this.borderColor = MC6847.COLOR.BLACK;
-
 		this.elementHeight = 12;
-
 		if (this.as) {
-
 			// Semigraphics.
-
 			this.bitsToParse = 2;
-
 			this.bitsPerPixel = 1;
-
 			this.pixelWidth = 4;
-
 			if (this.intext) {
-
 				// Semigraphics 6.
-
 				// Bits 0-5 define lighted (non-background) blocks; 6-7 define color within palette.
-
 				// [5][4]
-
 				// [3][2]
-
 				// [1][0]
-
 				if (this.rowCounter < 4) {
-
 					this.pattern = (this.dd >> 4) & 0x03;
-
 				} else if (this.rowCounter < 8) {
-
 					this.pattern = (this.dd >> 2) & 0x03;
-
 				} else {
-
 					this.pattern = this.dd & 0x03;
-
 				}
-
 				this.palette = [
-
 					MC6847.COLOR.BLACK,
-
 					MC6847.PALETTE.COLOR_GRAPHICS[this.css][(this.dd >> 6) & 0x3]
-
 				];
-
 			} else {
-
 				// Semigraphics 4.
-
 				// Bits 0-3 define lighted (non-background) blocks; 4-6 define color.
-
 				// [3][2]
-
 				// [1][0]
-
 				if (this.rowCounter < 6) {
-
 					this.pattern = (this.dd >> 2) & 0x03;
-
 				} else {
-
 					this.pattern = this.dd & 0x03;
-
 				}
-
 				this.palette = [
-
 					MC6847.COLOR.BLACK,
-
 					MC6847.PALETTE.SEMIGRAPHICS[(this.dd >> 4) & 0x07]
-
 				];
-
 			}
-
 		} else {
-
 			// Alphanumerics.
-
 			this.palette = MC6847.PALETTE.ALPHANUMERICS[this.css];
-
 			this.bitsPerPixel = 1;
-
 			this.pixelWidth = 1;
-
 			if (this.intext) {
-
 				// External.
-
 				// Fetch pattern from data input lines.
-
 				this.pattern = this.dd;
-
 			} else {
-
 				// Internal.
-
 				// Fetch pattern from internal font data.
-
 				// Data input lines select character to be displayed.
-
 				this.pattern = MC6847.FONT[this.dd & 0x3f][this.rowCounter];
-
 			}
-
 			if (this.inv) {
-
 				// Inverted.
-
 				this.pattern = 0xff ^ this.pattern;
-
 			}
-
 		}
-
 	}
-
 };
-
-
 
 MC6847.prototype.drawLine = function() {
-
 	var ctx = this.delegate.mc6847GetCanvas().getContext("2d");
-
 	
-
 	// Draw upper border if first line.
-
 	if (this.lineCounter == 0) {
-
 		// Vertical blanking: 13 H lines.
-
 		this.delegate.mc6847SetFs(this.fs = 1);
-
 		// Upper border: 25 H lines.
-
-		ctx.fillStyle = this.borderColor;
-
-		ctx.fillRect(0, 0, MC6847.HORIZONTAL_BORDER + 256 + MC6847.HORIZONTAL_BORDER, MC6847.VERTICAL_BORDER);
-
+		var imageData = new ImageData(MC6847.SCREEN_WIDTH, MC6847.VERTICAL_BORDER);
+		var a = 0;
+		for (var y = 0; y < MC6847.VERTICAL_BORDER; y++) {
+			for (var x = 0; x < MC6847.SCREEN_WIDTH; x++) {
+				for (var b = 0; b < 4; b++) {
+					imageData.data[a++] = this.borderColor.data[b];
+				}
+			}
+		}
+		ctx.putImageData(imageData, 0, 0);
+			
 		// Active display area: 192 H lines.
-
 		this.da = 0;
-
 		this.rowCounter = 0;
-
 	}
-
 	
-
+	var imageData = new ImageData(MC6847.SCREEN_WIDTH, 1);
+	var a = 0;
 	// Left border.
-
-	ctx.fillRect(0, MC6847.VERTICAL_BORDER + this.lineCounter, MC6847.HORIZONTAL_BORDER, 1);
+	for (var x = 0; x < MC6847.HORIZONTAL_BORDER; x++) {
+		for (var b = 0; b < 4; b++) {
+			imageData.data[a++] = this.borderColor.data[b];
+		}
+	}
 
 	// Active display area.
-
 	this.ag = this.delegate.mc6847GetAg();
-
 	this.gm = this.delegate.mc6847GetGm();
-
-	for (var x = 0; x < 256; ) {
-
+	for (var xx = 0; xx < 256; ) {
 		this.delegate.mc6847SetAddress(this.da);
-
 		this.dd = this.delegate.mc6847GetData();
-
 		this.as = this.delegate.mc6847GetAs();
-
 		this.intext = this.delegate.mc6847GetIntext();
-
 		this.inv = this.delegate.mc6847GetInv();
-
 		this.css = this.delegate.mc6847GetCss();
-
 		this.setup();
-
 		var bitMask = ((1 << this.bitsPerPixel) - 1) << (this.bitsToParse - this.bitsPerPixel);
-
 		for (var i = this.bitsToParse; i > 0; i -= this.bitsPerPixel) {
-
-			ctx.fillStyle = this.palette[(this.pattern & bitMask) >> (i - this.bitsPerPixel)];
-
-			ctx.fillRect(MC6847.HORIZONTAL_BORDER + x, MC6847.VERTICAL_BORDER + this.lineCounter, this.pixelWidth, 1);
-
+			var pixelColor = this.palette[(this.pattern & bitMask) >> (i - this.bitsPerPixel)];
+			for (var p = 0; p < this.pixelWidth; p++) {
+				for (var b = 0; b < 4; b++) {
+					imageData.data[a++] = pixelColor.data[b];
+				}
+				x++;
+				xx++;
+			}
 			bitMask >>= this.bitsPerPixel;
-
-			x += this.pixelWidth;
-
 		}
-
 		this.da =
-
 			(this.da & (0x1fff ^ (this.bytesPerLine - 1))) |
-
 			((this.da + 1) & (this.bytesPerLine -1));
-
 	}
-
 	if (++this.rowCounter >= this.elementHeight) {
-
 		this.da += this.bytesPerLine;
-
 		this.rowCounter = 0;
-
 	}
-
 	if (this.ag == 0) {
-
 		this.delegate.mc6847SetRp(this.rp = 0);
-
 		this.delegate.mc6847SetRp(this.rp = 1);
-
 	}
-
 	// Right border.
-
-	ctx.fillStyle = this.borderColor;
-
-	ctx.fillRect(MC6847.HORIZONTAL_BORDER + 256, MC6847.VERTICAL_BORDER + this.lineCounter, MC6847.HORIZONTAL_BORDER, 1);
-
-	
-
-	// Draw lower border if last line.
-
-	if (this.lineCounter++ == 191) {
-
-		this.delegate.mc6847SetFs(this.fs = 0);
-
-		// Bottom border: 26 H lines.
-
-		ctx.fillRect(0, MC6847.VERTICAL_BORDER + 192, MC6847.HORIZONTAL_BORDER + 256 + MC6847.HORIZONTAL_BORDER, MC6847.VERTICAL_BORDER);
-
-		// Vertical retrace: 6 H lines.
-
-		this.lineCounter = 0;
-
+	for ( ; x < MC6847.SCREEN_WIDTH; x++) {
+		for (var b = 0; b < 4; b++) {
+			imageData.data[a++] = this.borderColor.data[b];
+		}
 	}
-
+	ctx.putImageData(imageData, 0, MC6847.VERTICAL_BORDER + this.lineCounter);
+	
+	// Draw lower border if last line.
+	if (this.lineCounter++ == 191) {
+		this.delegate.mc6847SetFs(this.fs = 0);
+		// Bottom border: 26 H lines.
+		var imageData = new ImageData(MC6847.SCREEN_WIDTH, MC6847.VERTICAL_BORDER);
+		var a = 0;
+		for (y = 0; y < MC6847.VERTICAL_BORDER; y++) {
+			for (x = 0; x < MC6847.SCREEN_WIDTH; x++) {
+				for (var b = 0; b < 4; b++) {
+					imageData.data[a++] = this.borderColor.data[b];
+				}
+			}
+		}
+		ctx.putImageData(imageData, 0, MC6847.VERTICAL_BORDER + 192);
+		// Vertical retrace: 6 H lines.
+		this.lineCounter = 0;
+	}
 };
-
-
 
 MC6847.prototype.drawScreen = function() {
-
 	do {
-
 		this.drawLine()
-
 	} while (this.lineCounter != 0);
-
 };
-
